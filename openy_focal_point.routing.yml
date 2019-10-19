@@ -1,0 +1,7 @@
+openy_focal_point.preview:
+  path: '/admin/openy_focal_point/preview/{fid}/{focal_point_value}/{field_name}'
+  defaults:
+    _controller: '\Drupal\openy_focal_point\Controller\OpenYFocalPointPreviewController::previewContent'
+    _title: 'Focal Point Preview'
+  requirements:
+    _custom_access: '\Drupal\focal_point\Controller\FocalPointPreviewController::access'
