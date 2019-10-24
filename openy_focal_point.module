@@ -1,0 +1,37 @@
+<?php
+
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ * Implements hook_form_alter().
+ */
+function openy_focal_point_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $i = 1;
+}
+
+/**
+ * Implements hook_entity_browser_widget_info_alter().
+ */
+function openy_focal_point_entity_browser_widget_info_alter(array &$widgets) {
+  $i = 1;
+}
+
+/**
+ * Implements hook_field_widget_form_alter().
+ */
+function openy_focal_point_field_widget_form_alter(&$element, FormStateInterface $form_state, $context) {
+  return;
+
+  $field_definition = $context['items']->getFieldDefinition();
+  $field_definition_settings = $field_definition->getSettings();
+  if (isset($field_definition_settings['handler']) && $field_definition_settings['handler'] == 'default:media') {
+    $entity_browser_widget_paragraph_info = $form_state->get('entity_browser_widget_paragraph_info');
+    if (!empty($entity_browser_widget_paragraph_info)) {
+      // Set a hidden field.
+      $element['entity_browser_widget_paragraph_info'] = [
+        '#type' => 'hidden',
+        '#value' => $entity_browser_widget_paragraph_info,
+      ];
+    }
+  }
+}

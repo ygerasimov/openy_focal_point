@@ -12,7 +12,8 @@ use Drupal\Core\Url;
 
 /**
  * The difference with FocalPointImageWidget is in createPreviewLink() method
- * we use our custom route for Preview.
+ * we use our custom route for Preview and pass image styles to be used in
+ * preview dialog.
  */
 
 /**
@@ -43,7 +44,7 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
    * @return array
    *   The preview link form element.
    */
-  private static function createPreviewLink($fid, $field_name, array $element_selectors, $default_focal_point_value) {
+  private static function createPreviewLink($fid, $field_name, array $element_selectors, $default_focal_point_value, $image_styles) {
     // Replace comma (,) with an x to make javascript handling easier.
     $preview_focal_point_value = str_replace(',', 'x', $default_focal_point_value);
 
@@ -60,7 +61,7 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
           'field_name' => $field_name,
         ],
         [
-          'query' => ['focal_point_token' => $token],
+          'query' => ['focal_point_token' => $token, 'image_styles' => implode(':', $image_styles)],
         ]),
       '#attached' => [
         'library' => ['core/drupal.dialog.ajax'],
@@ -77,6 +78,10 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
     return $preview_link;
   }
 
+  /**
+   * Loads the entity view display entity and prepare list of all image styles
+   * used (to be passed with preview link).
+   */
   public static function process($element, FormStateInterface $form_state, $form) {
     $element = parent::process($element, $form_state, $form);
 
@@ -88,10 +93,73 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
       ];
       $default_focal_point_value = isset($item['focal_point']) ? $item['focal_point'] : $element['#focal_point']['offsets'];
 
-      $element['preview']['preview_link'] = self::createPreviewLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value);
+      // Search through $form_state['input'] for target_id => 'media:XX' element. If found
+      // use "entity_browser_widget" right next to it to get id that can be used
+      // to load image styles for the paragraph.
+      $paragraph_type = self::getParagraphInfo($fid, $form_state);
+
+      // Another big assumption here. We assume that Media has view modes named
+      // "prgf_<paragraph_name>".
+      $display = \Drupal::entityTypeManager()->getStorage('entity_view_display')->load('media.image.prgf_' . $paragraph_type);
+      $components = $display->getComponents();
+      // We assume that view mode displays only single field -- image.
+      $image_component = reset($components);
+
+      $used_breakpoints = [
+        $image_component['settings']['image_style'],
+      ];
+      foreach ($image_component['settings']['breakpoints'] as $breakpoint) {
+        if (!empty($breakpoint['image_style'])) {
+          $used_breakpoints[] = $breakpoint['image_style'];
+        }
+      }
+
+      $element['preview']['preview_link'] = self::createPreviewLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value, $used_breakpoints);
     }
 
     return $element;
+  }
+
+  /**
+   * Gets paragraph info data. We do a few assumptions here. We assume that
+   * there is a top level fields (references to paragraphs) like field_content,
+   * field_header_content etc. Also there should be subforms inside of the
+   * paragraphs. So our data is located in structure like:
+   * $form_state->getValues()['field_content'][0]['subform']['field_prgf_image']['entity_browser_widget_paragraph_info'];
+   *
+   * @see OpenYFocalPointEntityReferenceBrowserWidget::formElement() where we
+   * create a hidden field 'entity_browser_widget_paragraph_info'.
+   */
+  protected static function getParagraphInfo($fid, FormStateInterface $form_state) {
+    $query = \Drupal::entityTypeManager()->getStorage('media')->getQuery();
+    $query->condition('field_media_image', $fid);
+    $results = $query->execute();
+
+    $media_names = [];
+    foreach ($results as $media_id) {
+      $media_names[] = 'media:' . $media_id;
+    }
+
+    $form_state_values = $form_state->getUserInput();
+    foreach ($form_state_values as $top_level_key => $top_level_item) {
+      if (!is_array($top_level_item)) {
+        continue;
+      }
+
+      foreach ($top_level_item as $second_level_key => $second_level_item) {
+        if (!isset($second_level_item['subform'])) {
+          continue;
+        }
+
+        foreach ($second_level_item['subform'] as $subform_field_name => $subform_field_item) {
+          if (isset($subform_field_item['target_id'])
+            && in_array($subform_field_item['target_id'], $media_names)
+            && isset($subform_field_item['entity_browser_widget_paragraph_info'])) {
+            return $subform_field_item['entity_browser_widget_paragraph_info'];
+          }
+        }
+      }
+    }
   }
 
 }
