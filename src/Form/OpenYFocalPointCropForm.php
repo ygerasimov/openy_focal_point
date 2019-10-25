@@ -73,25 +73,33 @@ class OpenYFocalPointCropForm extends FormBase {
     /** @var \Drupal\file\Entity\File $file */
     $file = $form_state->get('file');
 
+    $type = 'crop_260_220';
+
     $input = $form_state->getUserInput();
-    $crop_properties = $input['prgf_teaser']['crop_wrapper']['crop_260_220']['crop_container']['values'];
+    $crop_properties = $input['prgf_teaser']['crop_wrapper'][$type]['crop_container']['values'];
 
-    $crop_storage = \Drupal::entityTypeManager()->getStorage('crop');
+    $crop = Crop::findCrop($file->getFileUri(), $type);
+    if ($crop) {
+      $crop->setSize($crop_properties['width'], $crop_properties['height']);
+      $crop->setPosition($crop_properties['x'], $crop_properties['height']);
+    }
+    else {
+      $crop_storage = \Drupal::entityTypeManager()->getStorage('crop');
+      $crop = $crop_storage->create([
+        'type' => $type,
+        'entity_id' => $file->id(),
+        'entity_type' => 'file',
+        'uri' => $file->getFileUri(),
+        'x' => (int) ($crop_properties['x'] + $crop_properties['width'] / 2),
+        'y' => (int) ($crop_properties['y'] + $crop_properties['height'] / 2),
+        'width' => $crop_properties['width'],
+        'height' => $crop_properties['height'],
+      ]);
+    }
 
-    $crop = $crop_storage->create([
-      'type' => 'crop_260_220',
-      'entity_id' => $file->id(),
-      'entity_type' => 'file',
-      'uri' => $file->getFileUri(),
-      'x' => (int) ($crop_properties['x'] + $crop_properties['width'] / 2),
-      'y' => (int) ($crop_properties['y'] + $crop_properties['height'] / 2),
-      'width' => $crop_properties['width'],
-      'height' => $crop_properties['height'],
-    ]);
     $crop->save();
 
     $ajax = new AjaxResponse();
-
     $ajax->addCommand(new CloseDialogCommand());
 
     return $ajax;
