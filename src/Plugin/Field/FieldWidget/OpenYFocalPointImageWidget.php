@@ -101,20 +101,24 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
       // Another big assumption here. We assume that Media has view modes named
       // "prgf_<paragraph_name>".
       $display = \Drupal::entityTypeManager()->getStorage('entity_view_display')->load('media.image.prgf_' . $paragraph_type);
-      $components = $display->getComponents();
-      // We assume that view mode displays only single field -- image.
-      $image_component = reset($components);
 
-      $used_breakpoints = [
-        $image_component['settings']['image_style'],
-      ];
-      foreach ($image_component['settings']['breakpoints'] as $breakpoint) {
-        if (!empty($breakpoint['image_style'])) {
-          $used_breakpoints[] = $breakpoint['image_style'];
+      if ($display) {
+        $components = $display->getComponents();
+        // We assume that view mode displays only single field -- image.
+        $image_component = reset($components);
+
+        $used_breakpoints = [
+          $image_component['settings']['image_style'],
+        ];
+        foreach ($image_component['settings']['breakpoints'] as $breakpoint) {
+          if (!empty($breakpoint['image_style'])) {
+            $used_breakpoints[] = $breakpoint['image_style'];
+          }
         }
+
+        $element['preview']['preview_link'] = self::createPreviewLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value, $used_breakpoints);
       }
 
-      $element['preview']['preview_link'] = self::createPreviewLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value, $used_breakpoints);
     }
 
     return $element;
