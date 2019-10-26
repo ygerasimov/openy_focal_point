@@ -34,6 +34,11 @@ class OpenYFocalPointPreviewController extends FocalPointPreviewController {
 
   public function content($fid, $focal_point_value) {
     $output = [];
+    $parameters = $this->request->attributes->all();
+    // This means dynamic focal_point_value passed as 3rd argument.
+    if (!strstr('field_', $parameters['field_name'])) {
+      $focal_point_value = $parameters['field_name'];
+    }
     $file = $this->fileStorage->load($fid);
     $image = $this->imageFactory->get($file->getFileUri());
     if (!$image->isValid()) {
@@ -99,7 +104,7 @@ class OpenYFocalPointPreviewController extends FocalPointPreviewController {
 //      '#derivative_image_note' => $derivative_image_note,
 //    ];
 
-    $form = \Drupal::formBuilder()->getForm('\Drupal\openy_focal_point\Form\OpenYFocalPointCropForm', $file, $styles);
+    $form = \Drupal::formBuilder()->getForm('\Drupal\openy_focal_point\Form\OpenYFocalPointCropForm', $file, $styles, $focal_point_value);
     $html = render($form);
 
     $options = [

@@ -7,6 +7,8 @@ use Drupal\Core\Ajax\CloseDialogCommand;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\crop\Entity\Crop;
+use Drupal\file\Entity\File;
+use Drupal\image\Entity\ImageStyle;
 use Drupal\shortcut\Entity\ShortcutSet;
 use Drupal\shortcut\ShortcutSetStorageInterface;
 use Drupal\user\UserInterface;
@@ -42,10 +44,44 @@ class OpenYFocalPointCropForm extends FormBase {
     $build_info = $form_state->getBuildInfo();
     $file = $build_info['args'][0];
     $image_styles = $build_info['args'][1];
+    $focal_point_value = $build_info['args'][2];
 
     $form_state->set('file', $file);
 
     foreach ($image_styles as $style) {
+      $style_label = $style->get('label');
+      $url = $this->buildUrl($style, $file, $focal_point_value);
+
+      $derivative_images[$style->id()] = [
+        'style' => $style_label,
+        'url' => $url,
+        'image' => [
+          '#theme' => 'image',
+          '#uri' => $url,
+          '#alt' => $this->t('OpenY Focal Point Preview: %label', ['%label' => $style_label]),
+          '#attributes' => [
+            'class' => ['focal-point-derivative-preview-image'],
+          ],
+        ],
+      ];
+
+      $form['openy_focal_point_preview'] = [
+        '#theme' => "openy_focal_point_preview",
+        '#data' => [
+          'derivative_images' => $derivative_images,
+        ]
+      ];
+
+      $form[$style->id()] = [
+        '#type' => 'image',
+        '#file' => $file,
+        '#crop_type_list' => ['crop_260_220'],
+        '#crop_preview_image_style' => 'crop_thumbnail',
+        '#show_default_crop' => FALSE,
+        '#show_crop_area' => TRUE,
+        '#warn_multiple_usages' => TRUE,
+        '#crop_types_required' => ['crop_260_220'],
+      ];
       $form[$style->id()] = [
         '#type' => 'image_crop',
         '#file' => $file,
@@ -110,6 +146,27 @@ class OpenYFocalPointCropForm extends FormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $i = 1;
+  }
+
+  /**
+   * Create the URL for a preview image including a query parameter.
+   *
+   * @param \Drupal\image\Entity\ImageStyle $style
+   *   The image style being previewed.
+   * @param \Drupal\file\Entity\File $image
+   *   The image being previewed.
+   * @param string $focal_point_value
+   *   The focal point being previewed in the format XxY where x and y are the
+   *   left and top offsets in percentages.
+   *
+   * @return \Drupal\Core\GeneratedUrl|string
+   *   The URL of the preview image.
+   */
+  protected function buildUrl(ImageStyle $style, File $image, $focal_point_value) {
+    $url = $style->buildUrl($image->getFileUri());
+    $url .= (strpos($url, '?') !== FALSE ? '&' : '?') . 'focal_point_preview_value=' . $focal_point_value;
+
+    return $url;
   }
 
 }
