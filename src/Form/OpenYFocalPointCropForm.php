@@ -2,6 +2,7 @@
 
 namespace Drupal\openy_focal_point\Form;
 
+use Drupal\Component\Utility\Random;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\CloseDialogCommand;
 use Drupal\Core\Form\FormBase;
@@ -9,6 +10,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\crop\Entity\Crop;
 use Drupal\file\Entity\File;
 use Drupal\image\Entity\ImageStyle;
+use Drupal\image_widget_crop\Element\ImageCrop;
 use Drupal\shortcut\Entity\ShortcutSet;
 use Drupal\shortcut\ShortcutSetStorageInterface;
 use Drupal\user\UserInterface;
@@ -48,8 +50,15 @@ class OpenYFocalPointCropForm extends FormBase {
 
     $form_state->set('file', $file);
 
+    $random = new Random();
+
     foreach ($image_styles as $style) {
       $style_label = $style->get('label');
+      // We add random to get parameter so everytime Preview popup is loaded
+      // fresh images are regenerated and browser cache is bypassed. So if
+      // we edit crop settings, save them and open Preview popup once again
+      // images are regenerated.
+      $focal_point_value .= '-' . $random->name();
       $url = $this->buildUrl($style, $file, $focal_point_value);
 
       $derivative_images[$style->id()] = [
@@ -113,11 +122,19 @@ class OpenYFocalPointCropForm extends FormBase {
 
     $input = $form_state->getUserInput();
     $crop_properties = $input['prgf_teaser']['crop_wrapper'][$type]['crop_container']['values'];
+    $x = (int) ($crop_properties['x'] + $crop_properties['width'] / 2);
+    $y = (int) ($crop_properties['y'] + $crop_properties['height'] / 2);
 
     $crop = Crop::findCrop($file->getFileUri(), $type);
     if ($crop) {
-      $crop->setSize($crop_properties['width'], $crop_properties['height']);
-      $crop->setPosition($crop_properties['x'], $crop_properties['height']);
+      if ($crop_properties['height'] == 0 && $crop_properties['width'] == 0) {
+        $crop->delete();
+        $crop = NULL;
+      }
+      else {
+        $crop->setSize($crop_properties['width'], $crop_properties['height']);
+        $crop->setPosition($x, $y);
+      }
     }
     else {
       $crop_storage = \Drupal::entityTypeManager()->getStorage('crop');
@@ -126,14 +143,16 @@ class OpenYFocalPointCropForm extends FormBase {
         'entity_id' => $file->id(),
         'entity_type' => 'file',
         'uri' => $file->getFileUri(),
-        'x' => (int) ($crop_properties['x'] + $crop_properties['width'] / 2),
-        'y' => (int) ($crop_properties['y'] + $crop_properties['height'] / 2),
+        'x' => $x,
+        'y' => $y,
         'width' => $crop_properties['width'],
         'height' => $crop_properties['height'],
       ]);
     }
 
-    $crop->save();
+    if ($crop) {
+      $crop->save();
+    }
 
     $ajax = new AjaxResponse();
     $ajax->addCommand(new CloseDialogCommand());
