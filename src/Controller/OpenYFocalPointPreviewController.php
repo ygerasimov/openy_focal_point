@@ -33,7 +33,6 @@ class OpenYFocalPointPreviewController extends FocalPointPreviewController {
   }
 
   public function content($fid, $focal_point_value) {
-    $output = [];
     $parameters = $this->request->attributes->all();
     // This means dynamic focal_point_value passed as 3rd argument.
     if (!strstr('field_', $parameters['field_name'])) {
@@ -52,57 +51,6 @@ class OpenYFocalPointPreviewController extends FocalPointPreviewController {
     // no good reason for anyone to preview an image unless they are changing
     // the focal point value.
     image_path_flush($image->getSource());
-
-//    $derivative_images = [];
-//    $derivative_image_note = '';
-//
-//    $original_image = [
-//      '#theme' => 'image',
-//      '#uri' => $image->getSource(),
-//      '#alt' => $this->t('Focal Point Preview Image'),
-//      '#attributes' => [
-//        'id' => 'focal-point-preview-image',
-//      ],
-//    ];
-//
-//    if (!empty($styles)) {
-//      foreach ($styles as $style) {
-//        $style_label = $style->get('label');
-//        $url = $this->buildUrl($style, $file, $focal_point_value);
-//
-//        $derivative_images[$style->getName()] = [
-//          'style' => $style_label,
-//          'url' => $url,
-//          'image' => [
-//            '#theme' => 'image',
-//            '#uri' => $url,
-//            '#alt' => $this->t('Focal Point Preview: %label', ['%label' => $style_label]),
-//            '#attributes' => [
-//              'class' => ['focal-point-derivative-preview-image'],
-//            ],
-//          ],
-//        ];
-//      }
-//      $derivative_image_note = $this->t('Click an image to see a larger preview. You may need to scroll horizontally for more image styles.');
-//    }
-//    else {
-//      // There are no styles that use a focal point effect to preview.
-//      $image_styles_url = Url::fromRoute('entity.image_style.collection')->toString();
-//      $this->messenger()->addWarning(
-//        $this->t('You must have at least one <a href=":url">image style</a> defined that uses a focal point effect in order to preview.',
-//          [':url' => $image_styles_url]
-//        )
-//      );
-//    }
-//
-//    $output['focal_point_preview_page'] = [
-//      '#theme' => "focal_point_preview_page",
-//      "#original_image" => $original_image,
-//      '#derivative_images' => $derivative_images,
-//      '#focal_point' => $focal_point_value,
-//      '#preview_image_note' => $this->t('This preview image above may have been scaled to fit on the page.'),
-//      '#derivative_image_note' => $derivative_image_note,
-//    ];
 
     $form = \Drupal::formBuilder()->getForm('\Drupal\openy_focal_point\Form\OpenYFocalPointCropForm', $file, $styles, $focal_point_value);
     $html = render($form);

@@ -81,25 +81,22 @@ class OpenYFocalPointCropForm extends FormBase {
         ]
       ];
 
-      $form[$style->id()] = [
-        '#type' => 'image',
-        '#file' => $file,
-        '#crop_type_list' => ['crop_260_220'],
-        '#crop_preview_image_style' => 'crop_thumbnail',
-        '#show_default_crop' => FALSE,
-        '#show_crop_area' => TRUE,
-        '#warn_multiple_usages' => TRUE,
-        '#crop_types_required' => ['crop_260_220'],
-      ];
+      // We assume that the last effect is a manual crop.
+      $effects = $style->getEffects()->getConfiguration();
+      $manual = array_pop($effects);
+      $crop_type = $manual['data']['crop_type'];
+
+      $form_state->set('crop_type', $crop_type);
+
       $form[$style->id()] = [
         '#type' => 'image_crop',
         '#file' => $file,
-        '#crop_type_list' => ['crop_260_220'],
+        '#crop_type_list' => [$crop_type],
         '#crop_preview_image_style' => 'crop_thumbnail',
-        '#show_default_crop' => FALSE,
+        '#show_default_crop' => TRUE,
         '#show_crop_area' => TRUE,
         '#warn_multiple_usages' => TRUE,
-        '#crop_types_required' => ['crop_260_220'],
+        '#crop_types_required' => [$crop_type],
       ];
     }
 
@@ -118,14 +115,14 @@ class OpenYFocalPointCropForm extends FormBase {
     /** @var \Drupal\file\Entity\File $file */
     $file = $form_state->get('file');
 
-    $type = 'crop_260_220';
+    $crop_type = $form_state->get('crop_type');
 
     $input = $form_state->getUserInput();
-    $crop_properties = $input['prgf_teaser']['crop_wrapper'][$type]['crop_container']['values'];
+    $crop_properties = $input['prgf_teaser']['crop_wrapper'][$crop_type]['crop_container']['values'];
     $x = (int) ($crop_properties['x'] + $crop_properties['width'] / 2);
     $y = (int) ($crop_properties['y'] + $crop_properties['height'] / 2);
 
-    $crop = Crop::findCrop($file->getFileUri(), $type);
+    $crop = Crop::findCrop($file->getFileUri(), $crop_type);
     if ($crop) {
       if ($crop_properties['height'] == 0 && $crop_properties['width'] == 0) {
         $crop->delete();
@@ -139,7 +136,7 @@ class OpenYFocalPointCropForm extends FormBase {
     else {
       $crop_storage = \Drupal::entityTypeManager()->getStorage('crop');
       $crop = $crop_storage->create([
-        'type' => $type,
+        'type' => $crop_type,
         'entity_id' => $file->id(),
         'entity_type' => 'file',
         'uri' => $file->getFileUri(),
@@ -164,7 +161,6 @@ class OpenYFocalPointCropForm extends FormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    $i = 1;
   }
 
   /**

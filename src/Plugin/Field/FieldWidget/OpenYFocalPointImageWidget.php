@@ -110,11 +110,13 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
         $used_breakpoints = [
           $image_component['settings']['image_style'],
         ];
-        foreach ($image_component['settings']['breakpoints'] as $breakpoint) {
-          if (!empty($breakpoint['image_style'])) {
-            $used_breakpoints[] = $breakpoint['image_style'];
-          }
-        }
+        // This is to pull mobile breakpoints from Blazy formatter. This is
+        // not being used at the moment. Keeping it for the future reference.
+//        foreach ($image_component['settings']['breakpoints'] as $breakpoint) {
+//          if (!empty($breakpoint['image_style'])) {
+//            $used_breakpoints[] = $breakpoint['image_style'];
+//          }
+//        }
 
         $element['preview']['preview_link'] = self::createPreviewLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value, $used_breakpoints);
       }
