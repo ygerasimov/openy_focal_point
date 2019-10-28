@@ -27,6 +27,7 @@
   min-height: 11.5em;
   vertical-align: top;
   cursor: pointer;
+  max-width: 25%;
 }
 
 .openy-focal-point-derivative-preview.active {
