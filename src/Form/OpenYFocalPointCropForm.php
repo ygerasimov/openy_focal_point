@@ -87,7 +87,7 @@ class OpenYFocalPointCropForm extends FormBase {
       $crop_type = $manual['data']['crop_type'];
 
       $form_state->set('crop_type', $crop_type);
-      
+
       $form[$style->id()] = [
         '#type' => 'image_crop',
         '#file' => $file,
