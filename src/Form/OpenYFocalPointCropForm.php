@@ -93,7 +93,7 @@ class OpenYFocalPointCropForm extends FormBase {
         '#file' => $file,
         '#crop_type_list' => [$crop_type],
         '#crop_preview_image_style' => 'crop_thumbnail',
-        '#show_default_crop' => TRUE,
+        '#show_default_crop' => FALSE,
         '#show_crop_area' => TRUE,
         '#warn_multiple_usages' => TRUE,
         '#crop_types_required' => [$crop_type],
@@ -102,11 +102,21 @@ class OpenYFocalPointCropForm extends FormBase {
 
     $form['submit'] = [
       '#type' => 'submit',
-      '#value' => $this->t('Save'),
+      '#value' => $this->t('Save Crop'),
       '#ajax' => [
         'callback' => '::ajaxSave',
       ],
     ];
+
+    $form['remove'] = [
+      '#type' => 'submit',
+      '#value' => $this->t('Remove cropping (use default focal point)'),
+      '#ajax' => [
+        'callback' => '::ajaxRemoveCropping',
+      ],
+    ];
+
+    $form['#attached']['library'][] = 'openy_focal_point/openy_focal_point';
 
     return $form;
   }
@@ -149,6 +159,23 @@ class OpenYFocalPointCropForm extends FormBase {
 
     if ($crop) {
       $crop->save();
+    }
+
+    $ajax = new AjaxResponse();
+    $ajax->addCommand(new CloseDialogCommand());
+
+    return $ajax;
+  }
+
+  public static function ajaxRemoveCropping(array $form, FormStateInterface $form_state) {
+    /** @var \Drupal\file\Entity\File $file */
+    $file = $form_state->get('file');
+
+    $crop_type = $form_state->get('crop_type');
+
+    $crop = Crop::findCrop($file->getFileUri(), $crop_type);
+    if ($crop) {
+        $crop->delete();
     }
 
     $ajax = new AjaxResponse();

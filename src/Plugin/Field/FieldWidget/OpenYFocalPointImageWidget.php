@@ -53,7 +53,7 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
 
     $preview_link = [
       '#type' => 'link',
-      '#title' => new TranslatableMarkup('Preview'),
+      '#title' => new TranslatableMarkup('Preview image and apply manual crop'),
       '#url' => new Url('openy_focal_point.preview',
         [
           'fid' => $fid,
@@ -119,6 +119,14 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
 //        }
 
         $element['preview']['preview_link'] = self::createPreviewLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value, $used_breakpoints);
+
+        $element['preview']['preview_link_note'] = [
+          '#type' => 'inline_template',
+          '#template' => '<div class="focal-point-preview-link-note">{{ note }}</div>',
+          '#context' => [
+            'note' => new TranslatableMarkup('Note: Focal Point and Crop Image cannot both be applied to the same image.'),
+          ]
+        ];
       }
 
     }
