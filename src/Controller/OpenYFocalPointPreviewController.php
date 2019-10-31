@@ -32,7 +32,10 @@ class OpenYFocalPointPreviewController extends FocalPointPreviewController {
     return $this->entityTypeManager()->getStorage('image_style')->loadMultiple($styles);
   }
 
-  public function content($fid, $focal_point_value) {
+  /**
+   * Callback to edit Manual Crop.
+   */
+  public function editCropContent($fid, $focal_point_value) {
     $parameters = $this->request->attributes->all();
     // This means dynamic focal_point_value passed as 3rd argument.
     if (!strstr('field_', $parameters['field_name'])) {
@@ -61,7 +64,45 @@ class OpenYFocalPointPreviewController extends FocalPointPreviewController {
     ];
     $response = new AjaxResponse();
     $response->addCommand(
-      new OpenModalDialogCommand($this->t('Images preview'), $html, $options)
+      new OpenModalDialogCommand($this->t('Manual Crop'), $html, $options)
+    );
+
+    return $response;
+  }
+
+  /**
+   * Callback to set Focal Point.
+   */
+  public function editFocalPointContent($fid, $focal_point_value) {
+    $parameters = $this->request->attributes->all();
+    // This means dynamic focal_point_value passed as 3rd argument.
+    if (!strstr('field_', $parameters['field_name'])) {
+      $focal_point_value = $parameters['field_name'];
+    }
+    $file = $this->fileStorage->load($fid);
+    $image = $this->imageFactory->get($file->getFileUri());
+    if (!$image->isValid()) {
+      throw new InvalidArgumentException('The file with id = $fid is not an image.');
+    }
+
+    $styles = $this->getFocalPointImageStyles();
+
+    // Since we are about to create a new preview of this image, we first must
+    // flush the old one. This should not be a performance hit since there is
+    // no good reason for anyone to preview an image unless they are changing
+    // the focal point value.
+    image_path_flush($image->getSource());
+
+    $form = \Drupal::formBuilder()->getForm('\Drupal\openy_focal_point\Form\OpenYFocalPointEditForm', $file, $styles, $focal_point_value);
+    $html = render($form);
+
+    $options = [
+      'dialogClass' => 'popup-dialog-class',
+      'width' => '80%',
+    ];
+    $response = new AjaxResponse();
+    $response->addCommand(
+      new OpenModalDialogCommand($this->t('Edit Focal Point'), $html, $options)
     );
 
     return $response;

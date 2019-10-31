@@ -44,7 +44,7 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
    * @return array
    *   The preview link form element.
    */
-  private static function createPreviewLink($fid, $field_name, array $element_selectors, $default_focal_point_value, $image_styles) {
+  private static function createCropLink($fid, $field_name, array $element_selectors, $default_focal_point_value, $image_styles) {
     // Replace comma (,) with an x to make javascript handling easier.
     $preview_focal_point_value = str_replace(',', 'x', $default_focal_point_value);
 
@@ -53,7 +53,7 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
 
     $preview_link = [
       '#type' => 'link',
-      '#title' => new TranslatableMarkup('Preview image and apply manual crop'),
+      '#title' => new TranslatableMarkup('Crop Image'),
       '#url' => new Url('openy_focal_point.preview',
         [
           'fid' => $fid,
@@ -67,7 +67,41 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
         'library' => ['core/drupal.dialog.ajax'],
       ],
       '#attributes' => [
-        'class' => ['focal-point-preview-link', 'use-ajax'],
+        'class' => ['use-ajax'],
+        'data-selector' => $element_selectors['focal_point'],
+        'data-field-name' => $field_name,
+        'data-dialog-type' => 'modal',
+        'target' => '_blank',
+      ],
+    ];
+
+    return $preview_link;
+  }
+
+  private static function createFocalPointEditLink($fid, $field_name, array $element_selectors, $default_focal_point_value, $image_styles) {
+    // Replace comma (,) with an x to make javascript handling easier.
+    $preview_focal_point_value = str_replace(',', 'x', $default_focal_point_value);
+
+    // Create a token to be used during an access check on the preview page.
+    $token = self::getPreviewToken();
+
+    $preview_link = [
+      '#type' => 'link',
+      '#title' => new TranslatableMarkup('Set Focal point'),
+      '#url' => new Url('openy_focal_point.edit_focal_point',
+        [
+          'fid' => $fid,
+          'focal_point_value' => $preview_focal_point_value,
+          'field_name' => $field_name,
+        ],
+        [
+          'query' => ['focal_point_token' => $token, 'image_styles' => implode(':', $image_styles)],
+        ]),
+      '#attached' => [
+        'library' => ['core/drupal.dialog.ajax'],
+      ],
+      '#attributes' => [
+        'class' => ['use-ajax'],
         'data-selector' => $element_selectors['focal_point'],
         'data-field-name' => $field_name,
         'data-dialog-type' => 'modal',
@@ -84,6 +118,11 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
    */
   public static function process($element, FormStateInterface $form_state, $form) {
     $element = parent::process($element, $form_state, $form);
+
+    if (isset($element['focal_point'])) {
+      $element['focal_point']['#access'] = FALSE;
+      $element['preview']['indicator']['#access'] = FALSE;
+    }
 
     if (isset($element['preview']['preview_link'])) {
       $item = $element['#value'];
@@ -118,7 +157,14 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
 //          }
 //        }
 
-        $element['preview']['preview_link'] = self::createPreviewLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value, $used_breakpoints);
+        $element['preview']['preview_link'] = [
+          '#type' => 'inline_template',
+          '#template' => '{{ focal_point_link }}  |  {{ crop_image_link }}',
+          '#context' => [
+            'focal_point_link' => self::createFocalPointEditLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value, $used_breakpoints),
+            'crop_image_link' => self::createCropLink($fid, $element['#field_name'], $element_selectors, $default_focal_point_value, $used_breakpoints),
+          ],
+        ];
 
         $element['preview']['preview_link_note'] = [
           '#type' => 'inline_template',

@@ -14,21 +14,21 @@ use Drupal\image\Entity\ImageStyle;
 /**
  * Form to create/edit crops in widget's preview popup.
  */
-class OpenYFocalPointCropForm extends FormBase {
+class OpenYFocalPointEditForm extends FormBase {
 
   /**
    * {@inheritdoc}
    */
   public function getFormId() {
-    return 'openy_focal_point_crop';
+    return 'openy_focal_point_edit';
   }
 
   /**
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state) {
-
     $build_info = $form_state->getBuildInfo();
+    /** @var File $file */
     $file = $build_info['args'][0];
     $image_styles = $build_info['args'][1];
     $focal_point_value = $build_info['args'][2];
@@ -66,38 +66,68 @@ class OpenYFocalPointCropForm extends FormBase {
         ]
       ];
 
-      // We assume that the last effect is a manual crop.
-      $effects = $style->getEffects()->getConfiguration();
-      $manual = array_pop($effects);
-      $crop_type = $manual['data']['crop_type'];
+      // From FocalPointImageWidget::createFocalPointField().
+      $crop_type = \Drupal::config('focal_point.settings')->get('crop_type');
+      $crop = Crop::findCrop($file->getFileUri(), $crop_type);
+      $image = \Drupal::service('image.factory')->get($file->getFileUri());
+      $width = $image->getWidth();
+      $height = $image->getHeight();
 
-      $form_state->set('crop_type', $crop_type);
+      $anchor = \Drupal::service('focal_point.manager')
+        ->absoluteToRelative($crop->x->value, $crop->y->value, $width, $height);
+      $focal_point_default_value = "{$anchor['x']},{$anchor['y']}";
 
-      $form[$style->id()] = [
-        '#type' => 'image_crop',
-        '#file' => $file,
-        '#crop_type_list' => [$crop_type],
-        '#crop_preview_image_style' => 'crop_thumbnail',
-        '#show_default_crop' => FALSE,
-        '#show_crop_area' => TRUE,
-        '#warn_multiple_usages' => TRUE,
-        '#crop_types_required' => [$crop_type],
+      $form['focal'] = [
+        '#type' => 'fieldset',
+        '#title' => $this->t('Set focal point'),
+      ];
+      // Should be unique class for textfield.
+      $focal_point_selector = 'focal-point-' . $style->id();
+
+      $form['focal'][$style->id()]['indicator'] = [
+        '#type' => 'html_tag',
+        '#tag' => 'div',
+        '#attributes' => [
+          'class' => ['focal-point-indicator'],
+          'data-selector' => $focal_point_selector,
+//          'data-delta' => $delta,
+        ],
+      ];
+
+      $form['focal'][$style->id()]['preview'] = [
+        '#theme' => 'image_style',
+        '#width' => $width,
+        '#height' => $height,
+        // @TODO: Avoid hardcoded style name. It comes from field settings.
+        '#style_name' => 'thumbnail_focal_point',
+        '#uri' => $file->getFileUri(),
+      ];
+
+      $form['focal'][$style->id()]['focal_point'] = [
+        '#type' => 'textfield',
+        '#title' => $this->t('Focal point'),
+        '#description' => $this->t('Specify the focus of this image in the form "leftoffset,topoffset" where offsets are in percents. Ex: 25,75'),
+        '#default_value' => $focal_point_default_value,
+//        '#element_validate' => [[static::class, 'validateFocalPoint']],
+        '#attributes' => [
+          'class' => ['focal-point', $focal_point_selector],
+          'data-selector' => $focal_point_selector,
+//          'data-field-name' => $field_name,
+        ],
+        '#wrapper_attributes' => [
+          'class' => ['focal-point-wrapper', 'visually-hidden', 'hidden'],
+        ],
+        '#attached' => [
+          'library' => ['focal_point/drupal.focal_point'],
+        ],
       ];
     }
 
     $form['submit'] = [
       '#type' => 'submit',
-      '#value' => $this->t('Save Crop'),
+      '#value' => $this->t('Save Focal Point'),
       '#ajax' => [
         'callback' => '::ajaxSave',
-      ],
-    ];
-
-    $form['remove'] = [
-      '#type' => 'submit',
-      '#value' => $this->t('Remove cropping (use default focal point)'),
-      '#ajax' => [
-        'callback' => '::ajaxRemoveCropping',
       ],
     ];
 
@@ -110,58 +140,17 @@ class OpenYFocalPointCropForm extends FormBase {
     /** @var \Drupal\file\Entity\File $file */
     $file = $form_state->get('file');
 
-    $crop_type = $form_state->get('crop_type');
-
-    $input = $form_state->getUserInput();
-    $crop_properties = $input['prgf_teaser']['crop_wrapper'][$crop_type]['crop_container']['values'];
-    $x = (int) ($crop_properties['x'] + $crop_properties['width'] / 2);
-    $y = (int) ($crop_properties['y'] + $crop_properties['height'] / 2);
-
+    $crop_type = \Drupal::config('focal_point.settings')->get('crop_type');
     $crop = Crop::findCrop($file->getFileUri(), $crop_type);
-    if ($crop) {
-      if ($crop_properties['height'] == 0 && $crop_properties['width'] == 0) {
-        $crop->delete();
-        $crop = NULL;
-      }
-      else {
-        $crop->setSize($crop_properties['width'], $crop_properties['height']);
-        $crop->setPosition($x, $y);
-      }
-    }
-    else {
-      $crop_storage = \Drupal::entityTypeManager()->getStorage('crop');
-      $crop = $crop_storage->create([
-        'type' => $crop_type,
-        'entity_id' => $file->id(),
-        'entity_type' => 'file',
-        'uri' => $file->getFileUri(),
-        'x' => $x,
-        'y' => $y,
-        'width' => $crop_properties['width'],
-        'height' => $crop_properties['height'],
-      ]);
-    }
 
-    if ($crop) {
-      $crop->save();
-    }
+    /** @var \Drupal\focal_point\FocalPointManagerInterface $focal_point_manager */
+    $focal_point_manager = \Drupal::service('focal_point.manager');
+    list($x, $y) = explode(',', $form_state->getValue('focal_point'));
+    $image = \Drupal::service('image.factory')->get($file->getFileUri());
+    $width = $image->getWidth();
+    $height = $image->getHeight();
 
-    $ajax = new AjaxResponse();
-    $ajax->addCommand(new CloseDialogCommand());
-
-    return $ajax;
-  }
-
-  public static function ajaxRemoveCropping(array $form, FormStateInterface $form_state) {
-    /** @var \Drupal\file\Entity\File $file */
-    $file = $form_state->get('file');
-
-    $crop_type = $form_state->get('crop_type');
-
-    $crop = Crop::findCrop($file->getFileUri(), $crop_type);
-    if ($crop) {
-        $crop->delete();
-    }
+    $focal_point_manager->saveCropEntity($x, $y, $width, $height, $crop);
 
     $ajax = new AjaxResponse();
     $ajax->addCommand(new CloseDialogCommand());
@@ -191,7 +180,10 @@ class OpenYFocalPointCropForm extends FormBase {
    */
   protected function buildUrl(ImageStyle $style, File $image, $focal_point_value) {
     $url = $style->buildUrl($image->getFileUri());
-    $url .= (strpos($url, '?') !== FALSE ? '&' : '?') . 'focal_point_preview_value=' . $focal_point_value;
+    // It is important to not use focal_point_preview_value query parameter as
+    // it is used by FocalPointEffectBase for preview so our focal point
+    // values will be overidden.
+    $url .= (strpos($url, '?') !== FALSE ? '&' : '?') . 'bypass_browser_cache=' . $focal_point_value;
 
     return $url;
   }
