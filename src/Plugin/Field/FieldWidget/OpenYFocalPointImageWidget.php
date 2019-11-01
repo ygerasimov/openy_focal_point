@@ -87,7 +87,7 @@ class OpenYFocalPointImageWidget extends FocalPointImageWidget {
 
     $preview_link = [
       '#type' => 'link',
-      '#title' => new TranslatableMarkup('Set Focal point'),
+      '#title' => new TranslatableMarkup('Set Focal Point'),
       '#url' => new Url('openy_focal_point.edit_focal_point',
         [
           'fid' => $fid,

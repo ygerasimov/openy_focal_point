@@ -103,7 +103,7 @@ class OpenYFocalPointEditForm extends FormBase {
 
       $form['focal'] = [
         '#type' => 'fieldset',
-        '#title' => $this->t('Set focal point'),
+        '#title' => $this->t('Set focal Point'),
       ];
       // Should be unique class for textfield.
       $focal_point_selector = 'focal-point-' . $style->id();
