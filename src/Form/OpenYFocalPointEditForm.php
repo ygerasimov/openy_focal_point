@@ -5,8 +5,11 @@ namespace Drupal\openy_focal_point\Form;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\CloseDialogCommand;
+use Drupal\Core\Ajax\ReplaceCommand;
+use Drupal\openy_focal_point\Ajax\RerenderThumbnailCommand;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\crop\Entity\Crop;
 use Drupal\file\Entity\File;
 use Drupal\image\Entity\ImageStyle;
@@ -39,7 +42,7 @@ class OpenYFocalPointEditForm extends FormBase {
 
     foreach ($image_styles as $style) {
       $style_label = $style->get('label');
-      // We add random to get parameter so everytime Preview popup is loaded
+      // We add random to get parameter so every time Preview popup is loaded
       // fresh images are regenerated and browser cache is bypassed. So if
       // we edit crop settings, save them and open Preview popup once again
       // images are regenerated.
@@ -63,7 +66,28 @@ class OpenYFocalPointEditForm extends FormBase {
         '#theme' => "openy_focal_point_preview",
         '#data' => [
           'derivative_images' => $derivative_images,
-        ]
+        ],
+      ];
+
+      // Check if this image already has manual crop.
+      $effects = $style->getEffects()->getConfiguration();
+      $manual = array_pop($effects);
+      $crop_type = $manual['data']['crop_type'];
+      $crop = Crop::findCrop($file->getFileUri(), $crop_type);
+      if ($crop) {
+        \Drupal::messenger()->deleteAll();
+
+        \Drupal::messenger()->addWarning('There is manual crop set for this image. It overrides focal point settings');
+        $status_messages = ['#type' => 'status_messages'];
+        $messages_html = drupal_render_root($status_messages);
+        $form['manual_crop_exists'] = [
+          '#markup' => $messages_html,
+        ];
+      }
+
+      // We will display "Focal point updated" message here.
+      $form['messages'] = [
+        '#markup' => '<div id="focal-point-dialog-messages"></div>'
       ];
 
       // From FocalPointImageWidget::createFocalPointField().
@@ -108,11 +132,9 @@ class OpenYFocalPointEditForm extends FormBase {
         '#title' => $this->t('Focal point'),
         '#description' => $this->t('Specify the focus of this image in the form "leftoffset,topoffset" where offsets are in percents. Ex: 25,75'),
         '#default_value' => $focal_point_default_value,
-//        '#element_validate' => [[static::class, 'validateFocalPoint']],
         '#attributes' => [
           'class' => ['focal-point', $focal_point_selector],
           'data-selector' => $focal_point_selector,
-//          'data-field-name' => $field_name,
         ],
         '#wrapper_attributes' => [
           'class' => ['focal-point-wrapper', 'visually-hidden', 'hidden'],
@@ -123,11 +145,21 @@ class OpenYFocalPointEditForm extends FormBase {
       ];
     }
 
-    $form['submit'] = [
+    $form['save_focal_point'] = [
       '#type' => 'submit',
+      '#name' => 'save_focal_point',
+      '#op' => 'save_focal_point',
       '#value' => $this->t('Save Focal Point'),
       '#ajax' => [
         'callback' => '::ajaxSave',
+      ],
+    ];
+
+    $form['close_dialog'] = [
+      '#type' => 'submit',
+      '#value' => $this->t('Close'),
+      '#ajax' => [
+        'callback' => '::closePopup',
       ],
     ];
 
@@ -152,9 +184,26 @@ class OpenYFocalPointEditForm extends FormBase {
 
     $focal_point_manager->saveCropEntity($x, $y, $width, $height, $crop);
 
+    image_path_flush($image->getSource());
+
+    // We are getting an error about Outdated form. For some reason that happens
+    // when there are multiple ajax forms in dialogs. Lets clean it up.
+    \Drupal::messenger()->deleteAll();
+
+    \Drupal::messenger()->addStatus('Focal point updated');
+    $status_messages = ['#type' => 'status_messages'];
+    $messages_html = drupal_render_root($status_messages);
+    $messages_html = '<div id="focal-point-dialog-messages">' . $messages_html . '</div>';
+
+    $ajax = new AjaxResponse();
+    $ajax->addCommand(new ReplaceCommand('#focal-point-dialog-messages', $messages_html));
+    $ajax->addCommand(new RerenderThumbnailCommand('.focal-point-derivative-preview-image'));
+    return $ajax;
+  }
+
+  public static function closePopup(array $form, FormStateInterface $form_state) {
     $ajax = new AjaxResponse();
     $ajax->addCommand(new CloseDialogCommand());
-
     return $ajax;
   }
 

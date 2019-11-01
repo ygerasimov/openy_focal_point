@@ -10,6 +10,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\crop\Entity\Crop;
 use Drupal\file\Entity\File;
 use Drupal\image\Entity\ImageStyle;
+use Drupal\openy_focal_point\Ajax\RerenderThumbnailCommand;
 
 /**
  * Form to create/edit crops in widget's preview popup.
@@ -39,7 +40,7 @@ class OpenYFocalPointCropForm extends FormBase {
 
     foreach ($image_styles as $style) {
       $style_label = $style->get('label');
-      // We add random to get parameter so everytime Preview popup is loaded
+      // We add random to get parameter so every time Preview popup is loaded
       // fresh images are regenerated and browser cache is bypassed. So if
       // we edit crop settings, save them and open Preview popup once again
       // images are regenerated.
@@ -80,7 +81,7 @@ class OpenYFocalPointCropForm extends FormBase {
         '#crop_preview_image_style' => 'crop_thumbnail',
         '#show_default_crop' => FALSE,
         '#show_crop_area' => TRUE,
-        '#warn_multiple_usages' => TRUE,
+        '#warn_multiple_usages' => FALSE,
         '#crop_types_required' => [$crop_type],
       ];
     }
@@ -98,6 +99,14 @@ class OpenYFocalPointCropForm extends FormBase {
       '#value' => $this->t('Remove cropping (use default focal point)'),
       '#ajax' => [
         'callback' => '::ajaxRemoveCropping',
+      ],
+    ];
+
+    $form['close_dialog'] = [
+      '#type' => 'submit',
+      '#value' => $this->t('Close'),
+      '#ajax' => [
+        'callback' => '::closePopup',
       ],
     ];
 
@@ -146,9 +155,11 @@ class OpenYFocalPointCropForm extends FormBase {
       $crop->save();
     }
 
-    $ajax = new AjaxResponse();
-    $ajax->addCommand(new CloseDialogCommand());
+    $image = \Drupal::service('image.factory')->get($file->getFileUri());
+    image_path_flush($image->getSource());
 
+    $ajax = new AjaxResponse();
+    $ajax->addCommand(new RerenderThumbnailCommand('.focal-point-derivative-preview-image'));
     return $ajax;
   }
 
@@ -163,9 +174,17 @@ class OpenYFocalPointCropForm extends FormBase {
         $crop->delete();
     }
 
+    $image = \Drupal::service('image.factory')->get($file->getFileUri());
+    image_path_flush($image->getSource());
+
     $ajax = new AjaxResponse();
     $ajax->addCommand(new CloseDialogCommand());
+    return $ajax;
+  }
 
+  public static function closePopup(array $form, FormStateInterface $form_state) {
+    $ajax = new AjaxResponse();
+    $ajax->addCommand(new CloseDialogCommand());
     return $ajax;
   }
 
